@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+<!--头部-->
+{% block title %} pods节点 {% endblock %}
+<!-停留的样式-->
+<!--layui-nav-itemed 为开关-->
+{% block nav-item-2 %} layui-nav-itemed {% endblock %}
+
+<!--layui-this 停留的背景颜色-->
+{% block nav-this-2-4 %}layui-this {% endblock %}
+
+
+<!--内容-->
+{% block content %}
+    <!--设置日志显示背景颜色-->
+    <div id="modal" style="display: none">
+        <form class="layui-form " action="">
+            <div id="log-text" class="layui-form-item"
+                 style="background-color: black;color: white;padding: 10px;font-size: 16px">
+            </div>
+        </form>
+    </div>
+    <div class="layui-card">
+        <div class="layui-card-body">
+            <table id="demo" lay-filter="test"></table>
+        </div>
+    </div>
+{% endblock %}
+
+
+
+<!--js代码-->
+{% block js %}
+    <script type="text/html" id="toolbarDemo">
+        <!--增加一个输入框-->
+        <input type="text" name="name" class="layui-input" style="width: 150px;height: 30px;float: left">
+        <button class="layui-btn layui-btn-sm" style="float: left" id="searchBtn">搜索</button>
+    </script>
+
+
+    <script type="text/html" id="barDemo">
+        <a class="layui-btn layui-btn-xs layui-btn-primary" lay-event="edit">YAML</a>
+        <a class="layui-btn layui-btn-normal layui-btn-xs" lay-event="terminal">终端</a>
+        <a class="layui-btn layui-btn-xs layui-bg-green" lay-event="log">查看日志</a>
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+    </script>
+
+    <script>
+
+        // 获取当前命名空间
+        var storage = window.sessionStorage;
+        var namespace = storage.getItem("namespace");
+
+
+        layui.use('table', function () {
+            var table = layui.table;
+            var layer = layui.layer;
+            var $ = layui.jquery;
+
+            table.render({
+                elem: '#demo'
+                , url: '{% url "workload:pods_api" %}?namespace=' + namespace      // 调用接口数据，并返回全局命名空间值
+                , toolbar: '#toolbarDemo' //开启头部工具栏，并为其绑定左侧模板
+                , defaultToolbar: ['filter', 'exports', 'print', { //自定义头部工具栏右侧图标。如无需自定义，去除该参数即可
+                    title: '提示'
+                    , layEvent: 'LAYTABLE_TIPS'
+                    , icon: 'layui-icon-tips'
+                }]
+                , title: '数据表'
+                , skin: 'line'         // 取消表格竖线
+                , cols: [[
+                    //{field: 'id', title: '序号', width: 80, fixed: 'left', type: 'numbers'},   // 序号排序，使用type：'numbers'
+                    {field: 'name', title: '名称', sort: true}
+                    , {field: 'namespace', title: '命名空间', sort: true, width: 120}
+                    , {field: 'pod_ip', title: 'IP地址', width: 160}
+                    , {field: 'labels', title: '标签', templet: labelsFormat}
+                    , {field: 'containers', title: '容器组', templet: containersFormat}
+                    , {field: 'status', title: '状态', sort: true, templet: statusFormat}
+                    , {field: 'create_time', title: '创建时间'}
+                    , {fixed: 'right', title: '操作', toolbar: '#barDemo', width: 250}
+                ]]
+                , page: true      // 设置分页
+                , id: "po"      // 设置表格重载， 这里使用必须是id："值"
+            });
+
+            // 标签格式化，是一个对象
+            function labelsFormat(d) {
+                result = "";
+                if (d.labels == null) {
+                    return "None"
+                } else {
+                    for (let key in d.labels) {
+                        result += '<span style="border: 1px solid #d6e5ec;border-radius: 8px">' +
+                            key + ':' + d.labels[key] +
+                            '</span><br>'
+                    }
+                    return result
+                }
+            }
+
+            function containersFormat(d) {
+                result = "";
+                if (d.containers) {
+                    for (let key in d.containers) {
+                        data = d.containers[key];
+                        result += key + ':' + data.c_name + '=' + data.c_image + '<br>' +
+                            '重启次数:' + data.restart_count + '<br>'
+                    }
+                    return result
+                } else {
+                    return "None"
+                }
+            }
+
+            // 如果status为None，使用容器状态显示
+            function statusFormat(d) {
+                result = "";
+                if (d.status == "None") {
+                    for (let key in d.containers) {
+                        result += d.containers[key].c_status + '<br>'
+                    }
+                    return result
+                } else {
+                    return d.status
+                }
+            }
+
+            //监听行工具事件
+            table.on('tool(test)', function (obj) {
+                var data = obj.data;
+                //console.log(obj)
+                if (obj.event === 'del') {
+                    console.log(data)
+                    layer.confirm('是否确定删除' + data["name"] + "这个命令空间吗", function (index) {
+                        csrf_token = $('[name=csrfmiddlewaretoken]').val();
+
+                        $.ajax({
+                            type: "DELETE",
+                            url: "{% url "workload:pods_api" %}",
+                            data: data,
+                            headers: {"X-CSRFToken": csrf_token},
+                            success: function (res) {
+                                if (res.code == 0) {
+                                    layer.msg(res.msg, {icon: 6});
+                                    obj.del()  // 页面删除
+                                } else {
+                                    layer.msg(res.msg, {icon: 5})
+                                }
+                            },
+                            error: function () {
+
+                            },
+                        });
+                    });
+                } else if (obj.event === 'edit') {
+                    layer.open({
+                        title: 'YAML',
+                        type: 2,
+                        area: ['60%', '60%'],
+                        content: "{% url 'ace_editor' %}?resource=pods&" + 'namespace=' + data['namespace'] + '&name=' + data['name'],
+                    });
+                } else if (obj.event === 'log') {
+                    // 逗号拼接容器名, 例如containers=c1,c2
+                    cs = data['containers'];
+                    containers = "";
+                    for (let c in cs) {
+                        if (c < cs.length - 1) {
+                            containers += cs[c]['c_name'] + ","
+                        } else {
+                            containers += cs[c]['c_name']
+                        }
+                    }
+                    layer.open({
+                        title: "容器终端",
+                        type: 2,
+                        area: ['60%', '70%'],
+                        content: '{% url "workload:pods_log" %}?namespace=' + data.namespace + '&pod_name=' + data.name + '&containers=' + containers
+                    });
+                } else if (obj.event === 'terminal') {
+                    // 逗号拼接容器名, 例如containers=c1,c2
+                    cs = data['containers'];
+                    containers = "";
+                    for (let c in cs) {
+                        if (c < cs.length - 1) {
+                            containers += cs[c]['c_name'] + ","
+                        } else {
+                            containers += cs[c]['c_name']
+                        }
+                    }
+                    layer.open({
+                        title: "容器终端",
+                        type: 2,  // 加载层，从另一个网址引用
+                        area: ['80%', '90%'],
+                        content: '{% url "workload:terminal" %}?namespace=' + data["namespace"] + "&pod_name=" + data["name"] + "&containers=" + containers,
+                    });
+                }
+            });
+
+            // 搜索功能
+            $(document).on('click', '#searchBtn', function () {
+                // 获取搜索的值
+                var input_val = $('input[name=name]').val();
+
+                // 判断用户是点击搜索按钮是否有值，没有就刷新当前页面，获取所有，否则就返回后端接口，刷新
+                if (input_val == "" || input_val == null || input_val == undefined) { // "",null,undefined
+                    console.log("为空")
+                    window.parent.location.reload()
+                } else {
+                    table.reload('po', {
+                        where: { //设定异步数据接口的额外参数，任意设
+                            // 要传回的key
+                            searchkey: input_val
+                        }
+                        , page: {
+                            curr: 1 //重新从第 1 页开始
+                        }
+                    }); //只重载数据
+                }
+
+            });
+
+
+        });
+
+    </script>
+
+
+{% endblock %}

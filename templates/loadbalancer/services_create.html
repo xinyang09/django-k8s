@@ -1,0 +1,191 @@
+
+{% extends 'base.html' %}
+{% block title %}service{% endblock %}
+{% block nav-item-3 %}layui-nav-itemed{% endblock %}
+{% block nav-this-3-1 %}layui-this{% endblock %}
+{% block content %}
+    <span class="layui-breadcrumb">
+      <a href="#">首页</a>
+      <a href="#">services</a>
+      <a><cite>create</cite></a>
+    </span>
+    <hr>
+
+    <div class="layui-card">
+        <div class="layui-card-body">
+
+        <fieldset class="layui-elem-field layui-field-title" style="margin-top: 20px;">
+          <legend>创建service</legend>
+        </fieldset>
+
+        <form class="layui-form " onclick="return false">
+            <div class="layui-form-item">
+                <label class="layui-form-label">名称：</label>
+                <div class="layui-input-block">
+                  <input type="text" name="name" lay-verify="required" lay-reqtext="名称是必填项，不能为空！" placeholder="" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">命名空间：</label>
+                <div class="layui-input-block">
+                <select name="namespace"  lay-verify="required" id="ns">
+                </select>
+                </div>
+             </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">Selector：</label>
+                <div class="layui-input-block">
+                  <input type="text" name="selector" lay-verify="required" lay-reqtext="名称是必填项，不能为空！" placeholder="" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">Port：</label>
+                <div class="layui-input-block">
+                  <input type="text" name="port" lay-verify="required" lay-reqtext="名称是必填项，不能为空！" placeholder="" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">TargetPort：</label>
+                <div class="layui-input-block">
+                  <input type="text" name="targetport" lay-verify="required" lay-reqtext="名称是必填项，不能为空！" placeholder="" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+
+            <div class="layui-form-item layui-hide" id="nodePortInput">
+                <label class="layui-form-label">NodePort：</label>
+                <div class="layui-input-block">
+                    <input type="text" name="nodePort" placeholder="请输入NodePort" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">标签：</label>
+                <div class="layui-input-block">
+                  <input type="text" name="labels" lay-verify="required" lay-reqtext="标签是必填项，不能为空！" placeholder="示例: project=ms,app=gateway" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+
+        <div class="layui-form-item">
+            <label class="layui-form-label">Type：</label>
+            <div class="layui-input-block">
+                <input type="radio" name="type" value="ClusterIP" title="ClusterIP">
+                <input type="radio" name="type" value="NodePort" title="NodePort">
+            </div>
+        </div>
+
+            <div class="layui-form-item">
+                <div class="layui-input-block">
+                  <button type="submit" class="layui-btn" lay-submit="" lay-filter="btn">立即提交</button>
+                  <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                </div>
+            </div>
+
+        </form>
+
+        </div>
+    </div>
+
+
+{% endblock %}
+
+{% block js %}
+
+    <script src="https://www.layuicdn.com/layui/layui.js"></script>
+<script>
+// 这里是获取全局命名空间
+var storage = window.sessionStorage;
+var namespace = storage.getItem("namespace");
+
+layui.use(['table','form','layer'], function(){
+  var table = layui.table;
+  var layer = layui.layer;
+  var form = layui.form;
+  var $ = layui.jquery;
+
+
+  // 获取表单数据
+
+  //form.render();
+
+  // 监听类型（Type）的选择变化
+    console.log($('#nodePortInput'));
+  form.on('radio(type)', function(data){
+      console.log(data.value)
+      console.log('Radio button value: ' + data.value);
+
+        $('#ns').append('<option value=' + namespace + '>' + namespace + '</option>');
+  form.render(); // 重新渲染表单，确保初始状态正确显示
+  });
+
+          document.addEventListener('DOMContentLoaded', function () {
+            const nodePortInput = document.getElementById('nodePortInput');
+            const radios = document.getElementsByName('type');
+
+            radios.forEach(function (radio) {
+                radio.addEventListener('change', function (event) {
+                    const selectedValue = event.target.value;
+                    console.log('Selected value:', selectedValue);
+
+                    if (selectedValue === 'NodePort') {
+                        nodePortInput.classList.remove('layui-hide');
+                    } else {
+                        nodePortInput.classList.add('layui-hide');
+                    }
+                });
+            });
+        });
+
+
+
+
+  // 监听提交
+  form.on('submit(btn)', function (event) {
+    var formData = {
+        name: $('input[name="name"]').val(),
+        namespace: $('select[name="namespace"]').val(),
+        select_: $('input[name="selector"]'),
+        labels: $('input[name="labels"]').val(),
+        port: $('input[name="port"]').val(),
+        targetPort: $('input[name="targetport"]').val(),
+        type: $('input[name="type"]:checked').val()  // 确保获取'checked'值
+    };
+
+
+    console.log(formData)
+    csrf_token = $('[name="csrfmiddlewaretoken"]').val();
+    csrf_token['csrfmiddlewaretoken'] = csrf_token;
+
+    $.ajax({
+        url: '{% url 'loadbalancer:services_api' %}',
+        type: "POST",
+        contentType: 'application/json',
+        headers: { 'X-CSRFToken': csrf_token },
+        data: JSON.stringify(formData), // 确保使用 JSON.stringify 将 formData 转换为 JSON 字符串
+        success: function (res) {
+            if (res.code == 0) {
+                layer.msg(res.msg, {icon: 6});
+                window.location.href = "{% url 'loadbalancer:services' %}";
+            } else {
+                layer.msg(res.msg, {icon: 5});
+            }
+        },
+        error: function (xhr) {
+            layer.msg("服务器接口异常", {icon: 5});
+            console.log(xhr.responseText);
+        }
+    });
+
+    return false;  // 阻止表单默认提交
+});
+
+});
+
+</script>
+
+{% endblock %}
